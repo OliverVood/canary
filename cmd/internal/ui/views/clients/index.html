@@ -1,0 +1,29 @@
+{{define "content"}}
+<div class = "view client index content_cower">
+    <div>
+        <a class = "btn" href = "/clients/create">Create</a>
+    </div>
+    <div class  = "list">
+        <table>
+            <thead>
+                <tr>
+                    <th>N</th>
+                    <th>UID</th>
+                    <th colspan = "3">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range $index, $item := .Data}}
+                    <tr>
+                        <td><span>{{$index}}</span></td>
+                        <td><span>{{$item.UID}}</span></td>
+                        <td><a href = "/clients/{{$item.UID}}">Open</a></td>
+                        <td><a href = "/clients/{{$item.UID}}/edit">Edit</a></td>
+                        <td><a href = "/clients/{{$item.UID}}" onclick = "clientDelete('/clients/{{$item.UID}}'); return false;">Delete</a></td>
+                    </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+</div>
+{{end}}

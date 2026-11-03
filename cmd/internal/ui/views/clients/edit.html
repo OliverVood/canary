@@ -1,0 +1,21 @@
+{{define "content"}}
+<div class = "view client edit content_cower content_center">
+    <form action = "/clients/{{.Data.UID}}" method = "POST">
+        <div>
+            <label>
+                <input type = "text" name = "login" placeholder = "Login" value = "{{.Data.Login}}">
+            </label>
+        </div>
+        <div>
+            <label>
+                <input type = "text" name = "email" placeholder = "E-mail" value = "{{.Data.Email}}">
+            </label>
+        </div>
+        <div>
+            <label>
+                <input type = "submit" class = "justify" onclick = "clientUpdate(this.closest('form')); return false;">
+            </label>
+        </div>
+    </form>
+</div>
+{{end}}
