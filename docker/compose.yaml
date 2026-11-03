@@ -1,0 +1,8 @@
+name: stack
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  pg_data:
