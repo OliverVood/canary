@@ -1,8 +1,9 @@
 CREATE TABLE IF NOT EXISTS clients (
-    id              uuid            PRIMARY KEY DEFAULT gen_random_uuid(),
-    login           text            NOT NULL,
-    email           text            NOT NULL,
-    date_create     timestamptz     NULL DEFAULT now(),
-    date_update     timestamptz     DEFAULT NULL,
-    date_delete     timestamptz     DEFAULT NULL
+    id              BIGINT          GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    uuid            UUID            DEFAULT gen_random_uuid() UNIQUE,
+    login           TEXT            NOT NULL,
+    email           TEXT            NOT NULL,
+    date_create     TIMESTAMPTZ     NULL DEFAULT now(),
+    date_update     TIMESTAMPTZ     DEFAULT NULL,
+    date_delete     TIMESTAMPTZ     DEFAULT NULL
 );

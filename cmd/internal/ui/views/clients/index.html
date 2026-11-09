@@ -16,10 +16,10 @@
                 {{range $index, $item := .Data}}
                     <tr>
                         <td><span>{{$index}}</span></td>
-                        <td><span>{{$item.UID}}</span></td>
-                        <td><a href = "/clients/{{$item.UID}}">Open</a></td>
-                        <td><a href = "/clients/{{$item.UID}}/edit">Edit</a></td>
-                        <td><a href = "/clients/{{$item.UID}}" onclick = "clientDelete('/clients/{{$item.UID}}'); return false;">Delete</a></td>
+                        <td><span>{{$item.UUID}}</span></td>
+                        <td><a href = "/clients/{{$item.UUID}}">Open</a></td>
+                        <td><a href = "/clients/{{$item.UUID}}/edit">Edit</a></td>
+                        <td><a href = "/clients/{{$item.UUID}}" onclick = "clientDelete('/clients/{{$item.UUID}}'); return false;">Delete</a></td>
                     </tr>
                 {{end}}
             </tbody>

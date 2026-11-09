@@ -50,7 +50,7 @@ async function clientCreate(form) {
 }
 
 function afterClientCreate(data) {
-    location.href = `/clients/${data.uid}`;
+    location.href = `/clients/${data.uuid}`;
 }
 
 async function clientUpdate(form) {
@@ -67,7 +67,7 @@ async function clientUpdate(form) {
 }
 
 function afterClientUpdate(data) {
-    location.href = `/clients/${data.uid}`;
+    location.href = `/clients/${data.uuid}`;
 }
 
 async function clientDelete(url) {

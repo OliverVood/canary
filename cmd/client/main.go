@@ -9,26 +9,14 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-var clients = NewTableClient()
-
 func main() {
 	fmt.Println("Launching the client management program...")
-
-	initClients()
 
 	router := chi.NewRouter()
 
 	regRouts(router)
 	regFileServer(router)
 	runServer(router)
-}
-
-func initClients() {
-	_, _ = clients.Save(RowSchemeClient{Login: "user_1", Email: "user1@example.com"})
-	_, _ = clients.Save(RowSchemeClient{Login: "user_2", Email: "user2@example.com"})
-	_, _ = clients.Save(RowSchemeClient{Login: "user_3", Email: "user3@example.com"})
-	_, _ = clients.Save(RowSchemeClient{Login: "user_4", Email: "user4@example.com"})
-	_, _ = clients.Save(RowSchemeClient{Login: "user_5", Email: "user5@example.com"})
 }
 
 func regRouts(router chi.Router) {
