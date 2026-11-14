@@ -1,19 +1,18 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"path/filepath"
 
-	"github.com/OliverVood/courier/cmd/internal/db"
 	"github.com/OliverVood/courier/cmd/internal/log"
 	"github.com/OliverVood/courier/cmd/internal/ui/template"
 	"github.com/go-chi/chi/v5"
 )
 
-var clients = NewTableClient()
-
-func home(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) home(w http.ResponseWriter, r *http.Request) {
 	log.Request(r)
 
 	templateData := template.NewData(nil, "Home")
@@ -21,59 +20,56 @@ func home(w http.ResponseWriter, r *http.Request) {
 	template.Render(w, filepath.Join("pages", "home"), templateData)
 }
 
-func index(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) index(w http.ResponseWriter, r *http.Request) {
 	log.Request(r)
 
-	base, err := db.Instance()
+	items, err := clients.All(r.Context(), h.DB)
 	if err != nil {
-		panic(err)
-	}
-	defer db.Close(base)
-
-	items, err := clients.All(base)
-	if err != nil {
-		panic(err)
+		if errors.Is(err, context.Canceled) {
+			return
+		}
+		http.Error(w, http.StatusText(http.StatusGatewayTimeout), http.StatusGatewayTimeout)
+		return
 	}
 
-	templateData := template.NewData(items, "Clients")
+	templateData := template.NewData(items, "ClientItems")
 
 	template.Render(w, filepath.Join("clients", "index"), templateData)
 }
 
-func create(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 	log.Request(r)
 
-	templateData := template.NewData(nil, "Client creating")
+	templateData := template.NewData(nil, "ClientItem creating")
 
 	template.Render(w, filepath.Join("clients", "create"), templateData)
 }
 
-func store(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) store(w http.ResponseWriter, r *http.Request) {
 	log.Request(r)
 
 	login := r.FormValue("login")
 	email := r.FormValue("email")
 
-	item := Client{
+	var err error
+
+	item := ClientItem{
 		Login: login,
 		Email: email,
 	}
 
-	base, err := db.Instance()
+	item, err = clients.Save(r.Context(), h.DB, item)
 	if err != nil {
-		panic(err)
-	}
-	defer db.Close(base)
-
-	item, err = clients.Save(item, base)
-	if err != nil {
-		http.Error(w, http.StatusText(500), 500)
+		if errors.Is(err, context.Canceled) {
+			return
+		}
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
 	err = json.NewEncoder(w).Encode(item)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
@@ -81,20 +77,21 @@ func store(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func show(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) show(w http.ResponseWriter, r *http.Request) {
 	log.Request(r)
 
 	uuid := chi.URLParam(r, "client")
 
-	base, err := db.Instance()
+	item, err := clients.Get(r.Context(), h.DB, uuid)
 	if err != nil {
-		panic(err)
-	}
-	defer db.Close(base)
-
-	item, ok := clients.Get(uuid, base)
-	if ok != nil {
-		http.NotFound(w, r)
+		if errors.Is(err, context.Canceled) {
+			return
+		}
+		if errors.Is(err, ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		http.Error(w, http.StatusText(http.StatusGatewayTimeout), http.StatusGatewayTimeout)
 		return
 	}
 
@@ -103,56 +100,67 @@ func show(w http.ResponseWriter, r *http.Request) {
 	template.Render(w, filepath.Join("clients", "show"), templateData)
 }
 
-func edit(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) edit(w http.ResponseWriter, r *http.Request) {
 	log.Request(r)
 
 	uuid := chi.URLParam(r, "client")
 
-	base, err := db.Instance()
+	item, err := clients.Get(r.Context(), h.DB, uuid)
 	if err != nil {
-		panic(err)
-	}
-	defer db.Close(base)
-
-	item, ok := clients.Get(uuid, base)
-	if ok != nil {
-		http.NotFound(w, r)
+		if errors.Is(err, context.Canceled) {
+			return
+		}
+		if errors.Is(err, ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		http.Error(w, http.StatusText(http.StatusGatewayTimeout), http.StatusGatewayTimeout)
 		return
 	}
 
-	templateData := template.NewData(item, "Client editing")
+	templateData := template.NewData(item, "ClientItem editing")
 
 	template.Render(w, filepath.Join("clients", "edit"), templateData)
 }
 
-func update(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 	log.Request(r)
 
 	uuid := chi.URLParam(r, "client")
 
+	isset, err := clients.Isset(r.Context(), h.DB, uuid)
+	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			return
+		}
+		http.Error(w, http.StatusText(http.StatusGatewayTimeout), http.StatusGatewayTimeout)
+		return
+	}
+	if !isset {
+		http.Error(w, http.StatusText(http.StatusGatewayTimeout), http.StatusGatewayTimeout)
+		return
+	}
+
 	email := r.FormValue("email")
 	login := r.FormValue("login")
 
-	item := Client{
+	item := ClientItem{
 		Login: login,
 		Email: email,
 	}
 
-	base, err := db.Instance()
+	item, err = clients.Update(r.Context(), h.DB, uuid, item)
 	if err != nil {
-		panic(err)
-	}
-	defer db.Close(base)
-
-	item, err = clients.Update(uuid, item, base)
-	if err != nil {
-		http.Error(w, http.StatusText(500), 500)
+		if errors.Is(err, context.Canceled) {
+			return
+		}
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
 	err = json.NewEncoder(w).Encode(item)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
@@ -160,20 +168,31 @@ func update(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func destroy(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) destroy(w http.ResponseWriter, r *http.Request) {
 	log.Request(r)
 
 	uuid := chi.URLParam(r, "client")
 
-	base, err := db.Instance()
+	isset, err := clients.Isset(r.Context(), h.DB, uuid)
 	if err != nil {
-		panic(err)
+		if errors.Is(err, context.Canceled) {
+			return
+		}
+		if errors.Is(err, ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		http.Error(w, http.StatusText(http.StatusGatewayTimeout), http.StatusGatewayTimeout)
+		return
 	}
-	defer db.Close(base)
+	if !isset {
+		http.Error(w, http.StatusText(http.StatusGatewayTimeout), http.StatusGatewayTimeout)
+		return
+	}
 
-	err = clients.Destroy(uuid, base)
+	err = clients.Destroy(uuid, h.DB)
 	if err != nil {
-		http.Error(w, http.StatusText(500), 500)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 

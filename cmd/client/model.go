@@ -1,26 +1,38 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"errors"
-	"fmt"
+	"time"
 )
 
-type Client struct {
+type Clients struct{}
+
+type ClientItem struct {
 	ID    int64  `json:"-"`
 	UUID  string `json:"uuid"`
 	Login string `json:"login"`
 	Email string `json:"mail"`
 }
 
-type Clients []Client
+type ClientItems []ClientItem
 
-func NewTableClient() *Clients {
+func NewClients() *Clients {
 	return &Clients{}
 }
 
-func (s *Clients) All(db *sql.DB) ([]Client, error) {
-	rows, err := db.Query("SELECT id, uuid, login, email FROM clients WHERE date_delete IS NULL ORDER BY id ASC")
+var clients = NewClients()
+
+var (
+	ErrNotFound = errors.New("client not found")
+)
+
+func (s *Clients) All(ctx context.Context, db *sql.DB) (ClientItems, error) {
+	ctxTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	rows, err := db.QueryContext(ctxTimeout, "SELECT id, uuid, login, email FROM clients WHERE date_delete IS NULL ORDER BY id ASC")
 	if err != nil {
 		return nil, err
 	}
@@ -31,10 +43,10 @@ func (s *Clients) All(db *sql.DB) ([]Client, error) {
 		}
 	}()
 
-	items := make([]Client, 0)
+	items := make([]ClientItem, 0)
 
 	for rows.Next() {
-		var item Client
+		var item ClientItem
 
 		err = rows.Scan(
 			&item.ID,
@@ -55,8 +67,12 @@ func (s *Clients) All(db *sql.DB) ([]Client, error) {
 	return items, nil
 }
 
-func (s *Clients) Save(item Client, db *sql.DB) (Client, error) {
-	err := db.QueryRow(
+func (s *Clients) Save(ctx context.Context, db *sql.DB, item ClientItem) (ClientItem, error) {
+	ctxTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	err := db.QueryRowContext(
+		ctxTimeout,
 		"INSERT INTO clients(login, email) VALUES ($1, $2) RETURNING id, uuid",
 		item.Login,
 		item.Email,
@@ -65,16 +81,20 @@ func (s *Clients) Save(item Client, db *sql.DB) (Client, error) {
 		&item.UUID,
 	)
 	if err != nil {
-		return Client{}, err
+		return ClientItem{}, err
 	}
 
 	return item, nil
 }
 
-func (s *Clients) Get(uuid string, db *sql.DB) (Client, error) {
-	item := Client{}
+func (s *Clients) Get(ctx context.Context, db *sql.DB, uuid string) (ClientItem, error) {
+	ctxTimeOut, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
 
-	err := db.QueryRow(
+	item := ClientItem{}
+
+	err := db.QueryRowContext(
+		ctxTimeOut,
 		"SELECT id, uuid, login, email FROM clients WHERE uuid = $1 AND date_delete IS NULL",
 		uuid,
 	).Scan(
@@ -85,7 +105,7 @@ func (s *Clients) Get(uuid string, db *sql.DB) (Client, error) {
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return item, fmt.Errorf("client not found")
+			return item, ErrNotFound
 		}
 		return item, err
 	}
@@ -93,13 +113,13 @@ func (s *Clients) Get(uuid string, db *sql.DB) (Client, error) {
 	return item, nil
 }
 
-func (s *Clients) Update(uuid string, item Client, db *sql.DB) (Client, error) {
-	if isset := clients.Isset(uuid, db); isset == false {
-		return item, fmt.Errorf("client not found")
-	}
+func (s *Clients) Update(ctx context.Context, db *sql.DB, uuid string, item ClientItem) (ClientItem, error) {
+	ctxTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
 
-	err := db.QueryRow(
-		"UPDATE clients SET login = $1, email = $2 WHERE uuid = $3 RETURNING id, uuid",
+	err := db.QueryRowContext(
+		ctxTimeout,
+		"UPDATE clients SET login = $1, email = $2 WHERE uuid = $3 AND date_delete IS NULL RETURNING id, uuid",
 		item.Login,
 		item.Email,
 		uuid,
@@ -108,7 +128,7 @@ func (s *Clients) Update(uuid string, item Client, db *sql.DB) (Client, error) {
 		&item.UUID,
 	)
 	if err != nil {
-		return Client{}, err
+		return ClientItem{}, err
 	}
 
 	return item, nil
@@ -123,20 +143,24 @@ func (s *Clients) Destroy(uuid string, db *sql.DB) error {
 	return nil
 }
 
-func (s *Clients) Isset(uuid string, db *sql.DB) bool {
-	item := Client{}
-	err := db.QueryRow(
+func (s *Clients) Isset(ctx context.Context, db *sql.DB, uuid string) (bool, error) {
+	ctxTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	item := ClientItem{}
+	err := db.QueryRowContext(
+		ctxTimeout,
 		"SELECT id FROM clients WHERE uuid = $1 AND date_delete IS NULL",
 		uuid,
 	).Scan(
 		&item.ID,
 	)
 	if err != nil {
-		return false
-	}
-	if item.ID == 0 {
-		return false
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
 	}
 
-	return true
+	return true, nil
 }

@@ -1,36 +1,57 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
 	"strings"
 
+	"github.com/OliverVood/courier/cmd/internal/db"
 	"github.com/go-chi/chi/v5"
 )
+
+type Handler struct {
+	DB *sql.DB
+}
 
 func main() {
 	fmt.Println("Launching the client management program...")
 
-	router := chi.NewRouter()
+	var err error
 
-	regRouts(router)
+	h := &Handler{}
+
+	h.DB, err = db.Instance()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func(database *sql.DB) {
+		err := database.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}(h.DB)
+
+	router := chi.NewRouter()
+	regRouts(router, h)
 	regFileServer(router)
 	runServer(router)
 }
 
-func regRouts(router chi.Router) {
+func regRouts(router chi.Router, h *Handler) {
+
 	fmt.Println("Router registration...")
 
-	router.Get("/", home)
+	router.Get("/", h.home)
 	router.Route("/clients", func(router chi.Router) {
-		router.Get("/", index)
-		router.Get("/create", create)
-		router.Post("/", store)
-		router.Get("/{client}", show)
-		router.Get("/{client}/edit", edit)
-		router.Patch("/{client}", update)
-		router.Delete("/{client}", destroy)
+		router.Get("/", h.index)
+		router.Get("/create", h.create)
+		router.Post("/", h.store)
+		router.Get("/{client}", h.show)
+		router.Get("/{client}/edit", h.edit)
+		router.Patch("/{client}", h.update)
+		router.Delete("/{client}", h.destroy)
 	})
 }
 
