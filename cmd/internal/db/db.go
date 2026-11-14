@@ -4,8 +4,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
@@ -41,8 +43,19 @@ func Instance() (*sql.DB, error) {
 		return nil, err
 	}
 
-	if err = db.Ping(); err != nil {
-		return nil, err
+	deadline := time.Now().Add(30 * time.Second)
+	i := 1
+	for {
+		if err = db.Ping(); err == nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			log.Printf("Database is unavailable after all attempts: %v", err)
+			return nil, errors.New("database is unavailable after all attempts")
+		}
+		log.Printf("Waiting database: %v. Repeat...", err)
+		time.Sleep(time.Duration(2*i) * time.Second)
+		i++
 	}
 
 	db.SetMaxOpenConns(config.options.maxOpenConnects)

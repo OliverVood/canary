@@ -26,6 +26,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	fmt.Println("Connection to database...")
 	defer func(database *sql.DB) {
 		err := database.Close()
 		if err != nil {
