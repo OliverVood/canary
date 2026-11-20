@@ -13,12 +13,12 @@ import (
 	_ "github.com/lib/pq"
 )
 
-type dbConfig struct {
-	connection dbConfigConnection
-	options    dBConfigOptions
+type config struct {
+	connection configConnection
+	options    configOptions
 }
 
-type dbConfigConnection struct {
+type configConnection struct {
 	host    string
 	port    string
 	base    string
@@ -27,13 +27,13 @@ type dbConfigConnection struct {
 	sslMode string
 }
 
-type dBConfigOptions struct {
+type configOptions struct {
 	maxOpenConnects int
 	maxIdleConnects int
 }
 
 func Instance() (*sql.DB, error) {
-	config, err := getConfig(".env")
+	config, err := getConfig("configs/database.env")
 	if err != nil {
 		return nil, err
 	}
@@ -64,12 +64,12 @@ func Instance() (*sql.DB, error) {
 	return db, err
 }
 
-func Close(db *sql.DB) {
-	_ = db.Close()
+func Close(db *sql.DB) error {
+	return db.Close()
 }
 
-func getConfig(file string) (*dbConfig, error) {
-	config := &dbConfig{}
+func getConfig(file string) (*config, error) {
+	config := &config{}
 	err := config.load(file)
 	if err != nil {
 		return nil, err
@@ -77,7 +77,7 @@ func getConfig(file string) (*dbConfig, error) {
 	return config, nil
 }
 
-func (c *dbConfig) load(file string) error {
+func (c *config) load(file string) error {
 	err := godotenv.Load(file)
 	if err != nil {
 		return errors.New("error loading DB config")
